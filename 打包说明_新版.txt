@@ -1,0 +1,67 @@
+# Kero SSCOM 打包说明
+
+## 打包脚本说明
+
+本项目提供了以下几个打包脚本：
+
+1. **一键打包.bat**
+   - 一键式打包解决方案，自动执行打包流程
+   - 首先生成可执行文件，然后检查是否安装了Inno Setup
+   - 如果已安装Inno Setup，则自动生成安装包
+
+2. **build_simple.bat**
+   - 仅打包应用程序为单个可执行文件
+   - 使用PyInstaller进行打包
+   - 输出文件位于dist目录下
+
+3. **build_installer.bat**
+   - 为已打包的应用程序生成安装包
+   - 需要先运行build_simple.bat生成可执行文件
+   - 需要安装Inno Setup才能使用
+   - 输出安装包位于installer目录下
+
+## 使用前提
+
+1. 已安装Python环境
+2. 如需生成安装包，需安装Inno Setup（https://jrsoftware.org/isdl.php）
+
+## 使用方法
+
+### 方法一：使用一键打包脚本
+
+1. 双击运行`一键打包.bat`
+2. 脚本会自动执行打包流程
+3. 如果未安装Inno Setup，脚本会提示您安装
+
+### 方法二：分步执行
+
+1. 首先运行`build_simple.bat`生成可执行文件
+2. 然后运行`build_installer.bat`生成安装包（需要安装Inno Setup）
+
+## 注意事项
+
+1. 打包过程中会清理旧的build和dist目录，请确保这些目录中没有重要文件
+2. 如果打包过程中出现错误，请检查错误信息并解决相应问题
+3. 生成的可执行文件位于dist目录下，安装包位于installer目录下
+
+## 自定义配置
+
+如需修改应用程序信息（如名称、版本等），请编辑相应脚本文件中的以下部分：
+
+```batch
+:: 设置应用程序信息
+set APP_NAME=Kero_SSCOM
+set APP_VERSION=0.0.1.0
+set APP_PUBLISHER=Kero
+```
+
+## 常见问题
+
+1. **问题**：运行脚本时出现乱码
+   **解决方案**：确保命令提示符使用正确的编码（脚本中已添加`chcp 936`命令设置为简体中文编码）
+
+2. **问题**：找不到PyInstaller
+   **解决方案**：脚本会自动尝试安装PyInstaller，如果安装失败，请手动运行`pip install pyinstaller`
+
+3. **问题**：找不到Inno Setup
+   **解决方案**：从https://jrsoftware.org/isdl.php下载并安装Inno Setup

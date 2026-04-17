@@ -647,18 +647,18 @@ class SerialLogger:
                     text = data.decode('utf-8', 'ignore')
                 except Exception:
                     text = ' '.join(f"{x:02X}" for x in data)
-                    
-                # 仅当尾部非CR/LF时追加换行
-                if self.add_newline and not (text.endswith('\n') or text.endswith('\r')):
-                    suffix = '\r\n'
-                else:
-                    suffix = ''
-                    
-                self._async_writer.write(f"{prefix} {text}{suffix}")
-                
+
+                # 按行分割，每行单独添加前缀
+                lines = text.splitlines()
+                if not lines:
+                    lines = [text]
+                line_suffix = '\r\n' if self.add_newline else ''
+                for line in lines:
+                    self._async_writer.write(f"{prefix} {line}{line_suffix}")
+
         except Exception as e:
             logger.error(f"记录RX数据失败: {e}")
-            
+
         self._size_rollover_if_needed()
 
     def log_tx(self, data: bytes):
@@ -687,18 +687,18 @@ class SerialLogger:
                     text = data.decode('utf-8', 'ignore')
                 except Exception:
                     text = ' '.join(f"{x:02X}" for x in data)
-                    
-                # 仅当尾部非CR/LF时追加换行
-                if self.add_newline and not (text.endswith('\n') or text.endswith('\r')):
-                    suffix = '\r\n'
-                else:
-                    suffix = ''
-                    
-                self._async_writer.write(f"{prefix} TX {text}{suffix}")
-                
+
+                # 按行分割，每行单独添加前缀
+                lines = text.splitlines()
+                if not lines:
+                    lines = [text]
+                line_suffix = '\r\n' if self.add_newline else ''
+                for line in lines:
+                    self._async_writer.write(f"{prefix} TX {line}{line_suffix}")
+
         except Exception as e:
             logger.error(f"记录TX数据失败: {e}")
-            
+
         self._size_rollover_if_needed()
 
     def get_status(self) -> dict:

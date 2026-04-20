@@ -369,7 +369,6 @@ class AutoReplyDialog(QDialog):
                     logger.error("无法找到AutoReplyEngine实例")
             except Exception as e2:
                 logger.error(f"备用同步方法也失败: {e2}")
-                print(f"同步自动应答规则到引擎失败: {e}, 备用方法: {e2}")
         
         logger.info("自动应答配置保存完成")
         

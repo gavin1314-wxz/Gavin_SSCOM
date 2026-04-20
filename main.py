@@ -20,7 +20,7 @@ from widget.AdvancedFunctionDialog import AdvancedFunctionDialog
 from widget.SerialSettingsDialog import SerialSettingsDialog
 from logger import SerialLogger
 from widget.AutoReplyEngine import AutoReplyEngine
-from widget.MultistringAdapter import init_multistring_adapter, get_multistring_adapter
+
 
 # 配置Python logging模块
 logging.basicConfig(
@@ -30,6 +30,7 @@ logging.basicConfig(
         logging.StreamHandler(sys.stdout)
     ]
 )
+logger = logging.getLogger(__name__)
 
 # 获取软件版本号
 def get_app_version():
@@ -48,7 +49,7 @@ def get_app_version():
                 if version:
                     return version
     except Exception as e:
-        print(f"读取版本文件失败: {e}")
+        logger.warning("读取版本文件失败: %s", e)
     
     # 如果读取版本文件失败，尝试通过git获取（仅开发环境）
     try:
@@ -138,7 +139,7 @@ class MyWindow(QtWidgets.QMainWindow, Ui_Kero_Serial):  # 继承QWidget和Ui_For
                 self.textBrowserShow.attach_logger(serial_logger)
                 serial_logger.on_new_part = self.textBrowserShow.on_logger_new_part
         except Exception as e:
-            print(f"绑定日志历史加载失败: {e}")
+            logger.warning("绑定日志历史加载失败: %s", e)
 
     def tabClose(self, index):
         # Main标签(index=0)不允许关闭
@@ -166,7 +167,7 @@ class MyWindow(QtWidgets.QMainWindow, Ui_Kero_Serial):  # 继承QWidget和Ui_For
                 for key in config_keys_to_remove:
                     if mSetting.contains(key):
                         mSetting.remove(key)
-                        print(f"已删除配置项: {key}")
+                        logger.debug("已删除配置项: %s", key)
                 
                 # 重新计算并更新过滤标签页数量
                 remaining_count = 0
@@ -180,7 +181,7 @@ class MyWindow(QtWidgets.QMainWindow, Ui_Kero_Serial):  # 继承QWidget和Ui_For
                 
                 mSetting.setValue("filter_tab_count", remaining_count)
                 mSetting.sync()
-                print(f"更新过滤标签页数量为: {remaining_count}")
+                logger.debug("更新过滤标签页数量为: %s", remaining_count)
         
         # 移除标签页
         self.tabWidget_2.removeTab(index)
@@ -267,14 +268,14 @@ class MyWindow(QtWidgets.QMainWindow, Ui_Kero_Serial):  # 继承QWidget和Ui_For
                         # 等待最多 2 秒退出
                         self.seq_worker.wait(2000)
                 except Exception as e:
-                    print(f"清理顺序线程时出错: {e}")
+                    logger.warning("清理顺序线程时出错: %s", e)
             
             # 停止自动重连监视器（如正在重连中）
             try:
                 if '_reconnect_active' in globals() and _reconnect_active:
                     _stop_reconnect_watchdog()
             except Exception as e:
-                print(f"停止重连监视器时出错: {e}")
+                logger.warning("停止重连监视器时出错: %s", e)
 
             # 关闭串口并清理线程
             if 'uithreadObj' in globals():
@@ -412,7 +413,7 @@ def add_filter(ui):
         new_FilterBrowser.apply_color_scheme(CURRENT_COLOR_THEME)
         new_FilterBrowser.colorSchemeSelected.connect(on_theme_changed)
     except Exception as e:
-        print(f"[新建Filter] 字体设置失败: {e}")
+        logger.warning("[新建Filter] 字体设置失败: %s", e)
     horizontalLayout_new = QtWidgets.QHBoxLayout()
     horizontalLayout_new.setSpacing(3)
     horizontalLayout_name = "horizontalLayout_" + str(ui.add_cnt)
@@ -458,7 +459,6 @@ def add_filter(ui):
     CaseSensitive_new.stateChanged.connect(lambda state, tab_id=ui.add_cnt: save_params_local(f'filter_case_sensitive_{tab_id}', state == 2))
     InvertMode_new.stateChanged.connect(lambda state, tab_id=ui.add_cnt: save_params_local(f'filter_invert_mode_{tab_id}', state == 2))
     
-    ffbrower = ui.tabWidget_2.widget(ui.tabWidget_2.count() - 1).findChild(QtWidgets.QTextBrowser)
 
 def _process_filter_pending_chunks():
     """批量处理过滤tab待更新数据，降低高频接收时主线程负载。"""
@@ -732,7 +732,7 @@ def _start_reconnect_watchdog(port, baud):
         if obj.mSerial.isOpen():
             obj.mSerial.close()
     except Exception as e:
-        print(f"[自动重连] 清理旧句柄失败（忽略）: {e}")
+        logger.debug("[自动重连] 清理旧句柄失败（忽略）: %s", e)
 
     timeout_sec = _get_reconnect_timeout_sec()
     _reconnect_port = port
@@ -749,7 +749,7 @@ def _start_reconnect_watchdog(port, baud):
     _reconnect_timer = QTimer()
     _reconnect_timer.timeout.connect(_reconnect_tick)
     _reconnect_timer.start(1000)
-    print(f"[自动重连] 已启动，端口={port}，超时={timeout_sec}s")
+    logger.info("[自动重连] 已启动，端口=%s，超时=%ss", port, timeout_sec)
 
 
 def _stop_reconnect_watchdog():
@@ -774,7 +774,7 @@ def _reconnect_tick():
 
     # 超时检查
     if time.time() >= _reconnect_deadline:
-        print("[自动重连] 超时，停止重连")
+        logger.info("[自动重连] 超时，停止重连")
         _stop_reconnect_watchdog()
         # 静默恢复 UI 到未连接状态
         checkoutPortStatus(True)
@@ -793,7 +793,7 @@ def _reconnect_tick():
         available = [p.device for p in _lp.comports()]
         if _reconnect_port not in available:
             remaining = max(0, int(_reconnect_deadline - time.time()))
-            print(f"[自动重连] 端口 {_reconnect_port} 不可见，剩余 {remaining}s")
+            logger.debug("[自动重连] 端口 %s 不可见，剩余 %ss", _reconnect_port, remaining)
             return
     except Exception:
         pass
@@ -807,7 +807,7 @@ def _reconnect_tick():
         if obj.mSerial.isOpen():
             obj.mSerial.close()
     except Exception as e:
-        print(f"[自动重连] 关闭旧句柄失败（忽略）: {e}")
+        logger.debug("[自动重连] 关闭旧句柄失败（忽略）: %s", e)
 
     # 尝试打开
     try:
@@ -820,17 +820,17 @@ def _reconnect_tick():
             checkoutPortStatus(False)
             ui.bt_open_off_port.setText('关闭串口')
             update_send_controls_enabled(True)
-            print(f"[自动重连] 重连成功：{port} @ {baud}")
+            logger.info("[自动重连] 重连成功：%s @ %s", port, baud)
             try:
                 session_name = f"{port}@{baud}"
                 serial_logger.on_connect(session_name=session_name, parent=MainWindow, port_name=port)
             except Exception as e:
-                print(f"[自动重连] 日志处理失败: {e}")
+                logger.warning("[自动重连] 日志处理失败: %s", e)
         else:
             remaining = max(0, int(_reconnect_deadline - time.time()))
-            print(f"[自动重连] 打开失败，剩余 {remaining}s")
+            logger.debug("[自动重连] 打开失败，剩余 %ss", remaining)
     except Exception as e:
-        print(f"[自动重连] 异常: {e}")
+        logger.error("[自动重连] 异常: %s", e)
 
 
 def at_callback_handler(obj):
@@ -846,7 +846,7 @@ def at_callback_handler(obj):
 
     if code == 2:
         _flush_receive_pending_chunks()
-        print(obj.get('error', '串口接收错误'))
+        logger.error(obj.get("error", "串口接收错误"))
         return
 
     buff = obj.get('data', b'')
@@ -859,7 +859,7 @@ def at_callback_handler(obj):
     try:
         auto_reply_engine.process_received_data(buff)
     except Exception as e:
-        print(f"自动应答处理失败: {e}")
+        logger.warning("自动应答处理失败: %s", e)
     
     # 更新接收统计
     ui.update_recv_stats(len(buff))
@@ -868,24 +868,10 @@ def at_callback_handler(obj):
     try:
         serial_logger.log_rx(buff)
     except Exception as e:
-        print(f"接收日志写入失败: {e}")
+        logger.warning("接收日志写入失败: %s", e)
 
     _queue_received_ui_data(buff)
 
-
-def clear_un_show(mys):
-    sl = list(mys)
-    i = 0
-    while i < len(sl):
-        s = sl[i]
-        try:
-            s = s.encode('raw_unicode_escape').decode('utf-8')
-            i += 1
-        except:
-            # 删掉它
-            sl.remove(s)
-    mys = ''.join(mys)
-    return (mys)
 
 def configure_text_browser_buffer():
     """
@@ -900,26 +886,14 @@ def configure_text_browser_buffer():
     ui.textBrowserShow.max_batch_chars = 1024 * 1024
     ui.textBrowserShow.max_merge_chars = 128 * 1024
     
-    print("串口接收缓存功能已配置:")
-    print(f"- 缓存大小: {ui.textBrowserShow.max_buffer_size}")
-    print(f"- 更新间隔: {ui.textBrowserShow.update_interval}ms")
-    print(f"- 批量大小: {ui.textBrowserShow.batch_size}")
-    print(f"- 最大显示行数: {ui.textBrowserShow.max_display_lines}")
-
-def get_buffer_status_info():
-    """
-    获取缓存状态信息，用于调试和监控
-    """
-    if hasattr(ui, 'textBrowserShow'):
-        status = ui.textBrowserShow.get_buffer_status()
-        return status
-    return None
+    logger.info("串口接收缓存功能已配置: 缓存=%d, 间隔=%dms, 批量=%d, 最大行=%d",
+                ui.textBrowserShow.max_buffer_size, ui.textBrowserShow.update_interval,
+                ui.textBrowserShow.batch_size, ui.textBrowserShow.max_display_lines)
 
 
 def windows_key_press(event):
     if event == Qt.Key_F5:
         ui.textBrowserShow.clear()
-    print(event)
 
 # 保存参数到本地
 def save_params_local(key, value):
@@ -992,7 +966,7 @@ def save_all_settings():
                     if invert_widget:
                         mSetting.setValue(f"filter_invert_mode_{saved_count}", invert_widget.isChecked())
                 except Exception as e:
-                    print(f"保存过滤tab {saved_count} 设置时出错: {e}")
+                    logger.warning("保存过滤tab %s 设置时出错: %s", saved_count, e)
                     continue
     
     # 更新实际保存的tab数量
@@ -1051,7 +1025,7 @@ def load_from_local():
     # 加载流控设置
     SERIAL_SETTINGS['flow_control'] = mSetting.value("serial/flow_control", "none", str)
     SERIAL_SETTINGS['timeout'] = mSetting.value("serial/timeout", 1.0)
-    print(f"[DEBUG] 从配置加载流控设置: {SERIAL_SETTINGS['flow_control']}")
+    logger.debug("从配置加载流控设置: %s", SERIAL_SETTINGS["flow_control"])
     
     # 发送设置
     ui.checkBox_send_hex.setChecked(mSetting.value("send_hex", False, bool))
@@ -1091,7 +1065,7 @@ def load_from_local():
     try:
         set_current_theme(theme_name)
     except Exception as e:
-        print(f"恢复颜色主题失败: {e}")
+        logger.warning("恢复颜色主题失败: %s", e)
     
     # 加载保存的过滤tab
     saved_tab_count = mSetting.value("filter_tab_count", 0, int)
@@ -1119,7 +1093,7 @@ def load_from_local():
                 invert_widget.setChecked(invert_mode)
                 
         except Exception as e:
-            print(f"加载过滤tab {i} 设置时出错: {e}")
+            logger.warning("加载过滤tab %s 设置时出错: %s", i, e)
             continue
 
     # 自定义按钮设置加载
@@ -1188,7 +1162,7 @@ def InitUI():
         ui.textBrowserShow.colorSchemeSelected.connect(on_theme_changed)
         ui.FilterBrowser.colorSchemeSelected.connect(on_theme_changed)
     except Exception as e:
-        print(f"主题信号连接失败: {e}")
+        logger.warning("主题信号连接失败: %s", e)
     refreshPort()
 
     # 点击按钮，打开串口
@@ -1207,7 +1181,7 @@ def InitUI():
             ui.quickbar_user_visible = True
         ui.bt_toggle_quickbar.setText('隐藏按钮')
     except Exception as e:
-        print(f"绑定快捷按钮切换失败: {e}")
+        logger.warning("绑定快捷按钮切换失败: %s", e)
     # 默认启动展开：显示底部内容
     ui.bottom_content_widget.setVisible(True)
     # 初始化折叠按钮图标与提示
@@ -1253,7 +1227,7 @@ def InitUI():
         ui.pushButton_import_sscom.clicked.connect(onImportSSCOM)
         ui.pushButton_export_sscom.clicked.connect(onExportSSCOM)
     except Exception as e:
-        print(f"绑定导入/导出按钮失败: {e}")
+        logger.warning("绑定导入/导出按钮失败: %s", e)
     
     # 连接设置改变信号，自动保存配置
     ui.checkBox_send_hex.stateChanged.connect(lambda: on_hex_mode_changed())
@@ -1265,7 +1239,7 @@ def InitUI():
     try:
         ui.checkBox_show_send.stateChanged.connect(lambda: save_params_local("show_send_echo", ui.checkBox_show_send.isChecked()))
     except Exception as e:
-        print(f"绑定显示发送控件失败: {e}")
+        logger.warning("绑定显示发送控件失败: %s", e)
     # 收发统计标签右键菜单
     ui.label_stats.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
     ui.label_stats.customContextMenuRequested.connect(onStatsContextMenu)
@@ -1286,7 +1260,7 @@ def InitUI():
             ui.horizontalLayout_5.insertWidget(idx, ui.bt_monitor)
         ui.bt_monitor.clicked.connect(open_advanced_function_dialog)
     except Exception as e:
-        print(f"插入监控按钮失败: {e}")
+        logger.warning("插入监控按钮失败: %s", e)
 
 def on_hex_mode_changed():
     """处理hex模式切换"""
@@ -1330,13 +1304,13 @@ def extract_effective_font_from_widget(widget):
             f.setFamily(family)
         
         # 调试输出
-        print(f"[字体解析] 样式表: {ss[:100]}...")
-        print(f"[字体解析] 原始字体: {original_family} {original_size}pt")
-        print(f"[字体解析] 解析结果: {f.family()} {f.pointSize()}pt")
+        logger.debug("[字体解析] 样式表: %s...", ss[:100])
+        logger.debug("[字体解析] 原始字体: %s %spt", original_family, original_size)
+        logger.debug("[字体解析] 解析结果: %s %spt", f.family(), f.pointSize())
         
         return f
     except Exception as e:
-        print(f"[字体解析] 解析失败: {e}")
+        logger.warning("[字体解析] 解析失败: %s", e)
         return widget.font()
 
 def on_theme_changed(name: str):
@@ -1350,7 +1324,7 @@ def apply_theme_to_all_browsers(name: str):
         if hasattr(ui, 'textBrowserShow'):
             # 以主接收区的实际显示字体作为全局基准（解析样式表）
             base_font = extract_effective_font_from_widget(ui.textBrowserShow)
-            print(f"[主题应用] 主接收区基准字体: {base_font.family()} {base_font.pointSize()}pt")
+            logger.debug("[主题应用] 主接收区基准字体: %s %spt", base_font.family(), base_font.pointSize())
             
             ui.textBrowserShow.setFont(base_font)
             try:
@@ -1362,7 +1336,7 @@ def apply_theme_to_all_browsers(name: str):
         # 过滤主tab内置 FilterBrowser
         if hasattr(ui, 'FilterBrowser'):
             if base_font is not None:
-                print(f"[主题应用] 设置FilterBrowser字体: {base_font.family()} {base_font.pointSize()}pt")
+                logger.debug("[主题应用] 设置FilterBrowser字体: %s %spt", base_font.family(), base_font.pointSize())
                 ui.FilterBrowser.setFont(base_font)
                 try:
                     ui.FilterBrowser.document().setDefaultFont(base_font)
@@ -1375,7 +1349,7 @@ def apply_theme_to_all_browsers(name: str):
             tab = ui.tabWidget_2.widget(i)
             for browser in tab.findChildren(MyTextBrowser):
                 if base_font is not None:
-                    print(f"[主题应用] 设置动态Filter字体: {base_font.family()} {base_font.pointSize()}pt")
+                    logger.debug("[主题应用] 设置动态Filter字体: %s %spt", base_font.family(), base_font.pointSize())
                     browser.setFont(base_font)
                     try:
                         browser.document().setDefaultFont(base_font)
@@ -1383,7 +1357,7 @@ def apply_theme_to_all_browsers(name: str):
                         pass
                 browser.apply_color_scheme(name)
     except Exception as e:
-        print(f"应用主题失败: {e}")
+        logger.error("应用主题失败: %s", e)
 
 def set_current_theme(name: str):
     global CURRENT_COLOR_THEME
@@ -1489,16 +1463,6 @@ def open_advanced_function_dialog():
 
 
 
-def OnClickCheckOutRun():
-    uithreadObj.set_rts(True)
-    uithreadObj.set_dts(False)
-    time.sleep(0.1)
-    uithreadObj.set_dts(True)
-    ui.checkBox_rts.setChecked(True)
-    ui.checkBox_dtr.setChecked(True)
-
-
-
 def OnClickOffCustomsExpand():
     is_hidden = not ui.tabWidget_expand.isHidden()
     
@@ -1592,9 +1556,9 @@ def onClickOpenOffPort():
         save_params_local('parity', SERIAL_SETTINGS['parity_index'])
         
         port = GET_PORT_ARRAY[ui.comboBox_port.currentIndex()]
-        str = ui.bt_open_off_port.text()
+        btn_text = ui.bt_open_off_port.text()
         
-        if str == '关闭串口':
+        if btn_text == '关闭串口':
             # 若处于自动重连中，先静默停止监视器
             if _reconnect_active:
                 _stop_reconnect_watchdog()
@@ -1613,10 +1577,10 @@ def onClickOpenOffPort():
                 try:
                     serial_logger.on_disconnect()
                 except Exception as e:
-                    print(f"日志断开处理失败: {e}")
+                    logger.warning("日志断开处理失败: %s", e)
             else:
                 QMessageBox.critical(MainWindow, '错误信息', '串口被占用或已拔开，无法打开')
-        if str == '打开串口':
+        if btn_text == '打开串口':
             # 在打开串口之前设置所有串口参数
             uithreadObj.set_default_parity(parity)
             uithreadObj.set_default_stopbits(float(stop_bits))
@@ -1625,11 +1589,9 @@ def onClickOpenOffPort():
             uithreadObj.set_default_baudrate(baud)
             # 设置流控
             flow_control = SERIAL_SETTINGS.get('flow_control', 'none')
-            print(f"[DEBUG] 打开串口前设置流控: {flow_control}")
             uithreadObj.set_default_flow_control(flow_control)
             
             if uithreadObj.try_open_port(port, baud):
-                print(f"[DEBUG] 串口已打开，流控设置: rtscts={uithreadObj.uartObj.mSerial.rtscts}, xonxoff={uithreadObj.uartObj.mSerial.xonxoff}")
                 checkoutPortStatus(False)
                 ui.bt_open_off_port.setText('关闭串口')
                 update_send_controls_enabled(True)
@@ -1637,7 +1599,7 @@ def onClickOpenOffPort():
                     session_name = f"{port}@{baud}"
                     serial_logger.on_connect(session_name=session_name, parent=MainWindow, port_name=port)
                 except Exception as e:
-                    print(f"日志连接处理失败: {e}")
+                    logger.warning("日志连接处理失败: %s", e)
             else:
                 QMessageBox.critical(MainWindow, '错误信息', '串口被占用或已拔开，无法打开')
 
@@ -1725,7 +1687,7 @@ def onToggleQuickbar():
             ui.centralwidget.updateGeometry()
             MainWindow.update()
     except Exception as e:
-        print(f"切换快捷按钮栏失败: {e}")
+        logger.warning("切换快捷按钮栏失败: %s", e)
 
 def OnClickSendData():
     if ui.checkBox_send_space_ctrl.checkState() == 0:
@@ -1842,7 +1804,7 @@ def initCustomsUI():
         if customs_layout is not None:
             _restore_layout_visibility(customs_layout)
     except Exception as e:
-        print(f"恢复多字符串布局可见性失败: {e}")
+        logger.warning("恢复多字符串布局可见性失败: %s", e)
 
     if getattr(ui, '_customs_legacy_bound', False):
         return
@@ -2110,7 +2072,7 @@ def echo_sent_bytes(data_bytes: bytes):
             try:
                 serial_logger.log_tx(data_bytes)
             except Exception as e:
-                print(f"发送HEX日志写入失败: {e}")
+                logger.warning("发送HEX日志写入失败: %s", e)
             return
 
         # 自动判断：能严格按UTF-8解码且主要为可打印字符就按字符串显示
@@ -2123,23 +2085,23 @@ def echo_sent_bytes(data_bytes: bytes):
                 try:
                     serial_logger.log_tx(data_bytes)
                 except Exception as e:
-                    print(f"发送STR日志写入失败: {e}")
+                    logger.warning("发送STR日志写入失败: %s", e)
             else:
                 out_s = ensure_trailing_newline("[TX HEX] " + bytes_to_hex(data_bytes))
                 ui.textBrowserShow.append_received_data(data=out_s, is_hex=True, add_timestamp=False, timestamp_str="")
                 try:
                     serial_logger.log_tx(data_bytes)
                 except Exception as e:
-                    print(f"发送HEX日志写入失败: {e}")
+                    logger.warning("发送HEX日志写入失败: %s", e)
         except UnicodeDecodeError:
             out_s = ensure_trailing_newline("[TX HEX] " + bytes_to_hex(data_bytes))
             ui.textBrowserShow.append_received_data(data=out_s, is_hex=True, add_timestamp=False, timestamp_str="")
             try:
                 serial_logger.log_tx(data_bytes)
             except Exception as e:
-                print(f"发送HEX日志写入失败: {e}")
+                logger.warning("发送HEX日志写入失败: %s", e)
     except Exception as e:
-        print(f"发送回显失败: {e}")
+        logger.error("发送回显失败: %s", e)
 
 # ---------------------- Gavin_com_multsrt.ini 兼容的导入/导出 ----------------------
 def parse_sscom_ini(file_path: str):
@@ -2347,7 +2309,7 @@ def import_multistring_from_sscom(file_path: str | None = None):
 def export_multistring_to_sscom(file_path: str | None = None):
     """将当前多字符串配置导出为 Gavin_com_multsrt.ini 可读格式（仅多字符串项）。"""
     try:
-        default_path = r'd:\\Work\\QT\\Gavin_com\\Gavin_com_multsrt.ini'
+        default_path = os.path.join(os.path.expanduser('~'), 'Gavin_com_multsrt.ini')
         if not file_path:
             initial = default_path
             chosen, _ = QFileDialog.getSaveFileName(MainWindow, '保存为 Gavin_com_multsrt.ini', initial, 'INI Files (*.ini);;All Files (*)')
@@ -2459,136 +2421,6 @@ class SequenceWorker(QtCore.QThread):
 
         self.finishedSignal.emit("completed")
 
-# 顺序执行函数
-def executeSequentially():
-    global loop_running
-    # 启动时切换按钮文案为“停止”，并标记运行中
-    ui.pushButton_stop_loop.setText("停止")
-    loop_running = True
-    ui.label_loop_status.setText("状态: 运行中")
-    
-    # 收集所有有序号的按钮
-    sequence_items = []
-    used_seq_nums = set()  # 用于检查重复序号
-    duplicate_seq_nums = []  # 记录重复的序号
-    
-    for i in range(1, 100):  # 支持到99个按钮
-        try:
-            seq_edit = getattr(ui, f'ed_customs_seq_{i}')
-            seq_text = seq_edit.text()
-            if seq_text and seq_text.strip():
-                try:
-                    seq_num = int(seq_text)
-                    if seq_num > 0:  # 只处理正整数
-                        # 检查序号是否重复
-                        if seq_num in used_seq_nums:
-                            if seq_num not in duplicate_seq_nums:
-                                duplicate_seq_nums.append(seq_num)
-                            continue  # 跳过重复的序号
-                        
-                        used_seq_nums.add(seq_num)
-                        
-                        # 获取其他相关控件
-                        edit = getattr(ui, f'ed_customs_set_{i}')
-                        hex_checkbox = getattr(ui, f'checkBox_hex_{i}')
-                        delay_edit = getattr(ui, f'ed_customs_delay_{i}')
-                        
-                        # 收集信息
-                        sequence_items.append({
-                            'index': i,
-                            'seq_num': seq_num,
-                            'text': edit.text(),
-                            'is_hex': hex_checkbox.isChecked(),
-                            'delay': int(delay_edit.text()) if delay_edit.text() else 0
-                        })
-                except ValueError:
-                    pass
-        except AttributeError:
-            break  # 如果找不到控件，说明已经到达按钮数量上限
-    
-    # 如果发现重复序号，显示警告信息并停止执行
-    if duplicate_seq_nums:
-        from PySide6.QtWidgets import QMessageBox
-        duplicate_str = ', '.join(map(str, duplicate_seq_nums))
-        QMessageBox.warning(MainWindow, '序号重复警告', 
-                          f'发现重复的序号: {duplicate_str}\n\n'
-                          f'请修正重复的序号设置后再执行顺序发送。\n'
-                          f'每个序号只能使用一次。')
-        return  # 停止执行顺序发送
-    
-    # 如果没有找到有效的序列项，直接返回
-    if not sequence_items:
-        return
-    
-    # 按序号排序
-    sequence_items.sort(key=lambda x: x['seq_num'])
-    
-    # 保存当前发送区域的内容和设置
-    original_send_text = ui.lineEdit_send_data.toPlainText()
-    original_hex_checked = ui.checkBox_send_hex.isChecked()
-    
-    # 检查是否需要循环执行
-    is_loop = ui.checkBox_loop.isChecked()
-    loop_count = 0
-    max_loops = 0
-    
-    if is_loop:
-        # 获取循环次数
-        try:
-            max_loops = int(ui.lineEdit_loop_count.text()) if ui.lineEdit_loop_count.text() else 0
-        except ValueError:
-            max_loops = 0
-        
-        # 如果循环次数无效，则默认为无限循环
-        if max_loops <= 0:
-            max_loops = 0
-        
-        # 设置循环状态为运行中
-        loop_running = True
-        ui.label_loop_status.setText(f"状态: 运行中 (0/{max_loops if max_loops != float('inf') else '∞'})")
-    
-    # 执行循环
-    while True:
-        # 执行一次完整的序列
-        for i, item in enumerate(sequence_items):
-            # 检查是否停止循环
-            if not loop_running:
-                ui.label_loop_status.setText("状态: 已停止")
-                # 恢复原始发送区域的设置
-                ui.checkBox_send_hex.setChecked(original_hex_checked)
-                return
-            
-            # 直接发送数据，避免受定时发送影响
-            sendCustomData(item['text'], item['is_hex'])
-            
-            # 处理事件，保持UI响应
-            QApplication.processEvents()
-            
-            # 延迟
-            if item['delay'] > 0:
-                time.sleep(item['delay'] / 1000.0)
-        
-        # 如果不是循环模式，执行一次后退出
-        if not is_loop:
-            break
-        
-        # 增加循环计数
-        loop_count += 1
-        
-        # 更新状态显示
-        ui.label_loop_status.setText(f"状态: 运行中 ({loop_count}/{max_loops if max_loops != float('inf') else '∞'})")
-        
-        # 检查是否达到最大循环次数
-        if max_loops > 0 and loop_count >= max_loops:
-            loop_running = False
-            ui.label_loop_status.setText(f"状态: 已完成 ({loop_count}/{max_loops})")
-            break
-    # 恢复原始发送区域的设置
-    ui.checkBox_send_hex.setChecked(original_hex_checked)
-    # 运行结束，恢复按钮文案与运行状态
-    ui.pushButton_stop_loop.setText("开始")
-    loop_running = False
-
 # 开始/停止按钮点击处理
 def onToggleLoopClicked():
     if loop_running:
@@ -2698,26 +2530,15 @@ def DoubleOnclickCustoms(button):
     text, ok = QInputDialog.getText(button, '备注', '请输入备注：', QLineEdit.Normal, current_text)
     if text and ok:
         button.setText(str(text))
-        print(button.objectName() + ' '+ str(text))
+        logger.debug("%s %s", button.objectName(), text)
         save_params_local(button.objectName(), str(text))
-
-# 查找最大的已使用索引
-def find_max_used_index():
-    max_index = 0
-    for i in range(1, 22):  # UI中只定义了21个按钮
-        try:
-            button_text = eval(f'ui.bt_customs_send_{i}.text()')
-            if button_text and button_text.strip() and button_text != str(i):
-                max_index = i
-        except:
-            break
-    return max_index
 
 # 查找第一个空闲索引
 def find_first_empty_index():
-    for i in range(1, 100):  # 支持99个按钮
+    for i in range(1, 100):
         try:
-            button_text = eval(f'ui.bt_customs_send_{i}.text()')
+            button = getattr(ui, f'bt_customs_send_{i}')
+            button_text = button.text()
             if not button_text or button_text == str(i):
                 return i
         except AttributeError:
@@ -2729,28 +2550,27 @@ def clear_all_entries():
     reply = QMessageBox.question(MainWindow, '确认', '确定要清空所有条目吗？', 
                                 QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
     if reply == QMessageBox.Yes:
-        for i in range(1, 100):  # 支持99个按钮
+        for i in range(1, 100):
             try:
-                exec(f'ui.bt_customs_send_{i}.setText("{i}")')
-                exec(f'ui.ed_customs_set_{i}.setText("")')
-                # 同步清空HEX勾选、延迟与序号输入框
+                getattr(ui, f'bt_customs_send_{i}').setText(str(i))
+                getattr(ui, f'ed_customs_set_{i}').setText('')
                 try:
-                    exec(f'ui.checkBox_hex_{i}.setChecked(False)')
+                    getattr(ui, f'checkBox_hex_{i}').setChecked(False)
                     save_params_local(f'checkBox_hex_{i}', False)
                 except Exception:
                     pass
                 try:
-                    exec(f'ui.ed_customs_delay_{i}.setText("")')
-                    save_params_local(f'ed_customs_delay_{i}', "")
+                    getattr(ui, f'ed_customs_delay_{i}').setText('')
+                    save_params_local(f'ed_customs_delay_{i}', '')
                 except Exception:
                     pass
                 try:
-                    exec(f'ui.ed_customs_seq_{i}.setText("")')
-                    save_params_local(f'ed_customs_seq_{i}', "")
+                    getattr(ui, f'ed_customs_seq_{i}').setText('')
+                    save_params_local(f'ed_customs_seq_{i}', '')
                 except Exception:
                     pass
                 save_params_local(f'bt_customs_send_{i}', str(i))
-                save_params_local(f'groupBox_customs_data_{i}', "")
+                save_params_local(f'groupBox_customs_data_{i}', '')
             except AttributeError:
                 break
 
@@ -2763,26 +2583,13 @@ def clear_all_entries():
 # 添加新条目
 def add_new_entry():
     empty_index = find_first_empty_index()
-    if empty_index > 0 and empty_index <= 99:  # 支持99个按钮
+    if empty_index > 0 and empty_index <= 99:
         text, ok = QInputDialog.getText(ui.groupBox_customs, '新增条目', '请输入备注：')
         if text and ok:
-            exec(f'ui.bt_customs_send_{empty_index}.setText("{text}")')
+            getattr(ui, f'bt_customs_send_{empty_index}').setText(text)
             save_params_local(f'bt_customs_send_{empty_index}', text)
     else:
         QMessageBox.information(MainWindow, '提示', '已达到最大条目数量！')
-
-# 扩展面板右键菜单
-def onCustomsContextMenu(pos):
-    menu = QMenu()
-    addAction = menu.addAction("新增条目")
-    clearAction = menu.addAction("清空条目")
-    
-    action = menu.exec(ui.groupBox_customs.mapToGlobal(pos))
-    
-    if action == addAction:
-        add_new_entry()
-    elif action == clearAction:
-        clear_all_entries()
 
 # 收发状态标签右键菜单
 def onStatsContextMenu(pos):
@@ -2834,22 +2641,22 @@ def onButtonContextMenu(button, index, pos):
                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if reply == QMessageBox.Yes:
             # 直接清空当前条目，不移动其他条目
-            exec(f'ui.bt_customs_send_{index}.setText("{index}")')
-            exec(f'ui.ed_customs_set_{index}.setText("")')
+            getattr(ui, f'bt_customs_send_{index}').setText(str(index))
+            getattr(ui, f'ed_customs_set_{index}').setText('')
             # 同步清空HEX勾选、延迟与序号输入框
             try:
-                exec(f'ui.checkBox_hex_{index}.setChecked(False)')
+                getattr(ui, f'checkBox_hex_{index}').setChecked(False)
                 save_params_local(f'checkBox_hex_{index}', False)
             except Exception:
                 pass
             try:
-                exec(f'ui.ed_customs_delay_{index}.setText("")')
-                save_params_local(f'ed_customs_delay_{index}', "")
+                getattr(ui, f'ed_customs_delay_{index}').setText('')
+                save_params_local(f'ed_customs_delay_{index}', '')
             except Exception:
                 pass
             try:
-                exec(f'ui.ed_customs_seq_{index}.setText("")')
-                save_params_local(f'ed_customs_seq_{index}', "")
+                getattr(ui, f'ed_customs_seq_{index}').setText('')
+                save_params_local(f'ed_customs_seq_{index}', '')
             except Exception:
                 pass
             save_params_local(f'bt_customs_send_{index}', str(index))
@@ -2906,15 +2713,15 @@ if __name__ == '__main__':
                     ui.quick_button_bar._append_button({'label': '0x55AA', 'text': '55 AA 01 02', 'is_hex': True, 'append_newline': False, 'color': 'Orange'})
                     ui.quick_button_bar._save_settings()
                 except Exception as e:
-                    print(f"初始化示例快捷按钮失败: {e}")
+                    logger.warning("初始化示例快捷按钮失败: %s", e)
     except Exception as e:
-        print(f"绑定快捷按钮栏失败: {e}")
+        logger.warning("绑定快捷按钮栏失败: %s", e)
     # 初始化日志管理器父窗口与配置
     try:
         serial_logger.set_parent(MainWindow)
         serial_logger.load_from_qsettings()
     except Exception as e:
-        print(f"初始化日志管理器失败: {e}")
+        logger.warning("初始化日志管理器失败: %s", e)
     # 从上次记录获取面板设置显示
     load_from_local()
     # 居中显示

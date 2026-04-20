@@ -281,8 +281,6 @@ class ui_thread(QObject):
             elif obj.get('code') == self.uartObj.CODE_ERROR:
                 logger.error(f"串口错误: {obj.get('error', '未知错误')}")
                 
-            # 添加描述信息并转发
-            obj['des'] = '【模块-->MCU】 设置模块为 station 模式成功'
             self.signalParseCMD.emit(obj)
             
         except Exception as e:

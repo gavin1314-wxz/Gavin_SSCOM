@@ -203,7 +203,6 @@ class Ui_Kero_Serial(object):
         self.gridLayout_13.addLayout(self.verticalLayout, 0, 0, 1, 1)
         self.tabWidget_2.addTab(self.tab_4, "")
         self.horizontalLayout.addWidget(self.top_splitter)
-        self.groupBox_proto = QtWidgets.QGroupBox(self.groupBox)
         self.tabWidget_expand = QtWidgets.QTabWidget(self.top_splitter)
         self.tabWidget_expand.setObjectName("tabWidget_expand")
         

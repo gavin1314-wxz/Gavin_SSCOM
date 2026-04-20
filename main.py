@@ -88,7 +88,7 @@ serial_logger = SerialLogger()
 auto_reply_engine = AutoReplyEngine()
 
 FILTER_UPDATE_INTERVAL_MS = 1000
-FILTER_MAX_CHUNKS_PER_TICK = 4096
+FILTER_MAX_CHUNKS_PER_TICK = 64
 FILTER_MAX_QUEUE_CHUNKS = 2000
 _filter_pending_chunks = deque()
 _filter_update_timer = None
@@ -114,6 +114,8 @@ class MyWindow(QtWidgets.QMainWindow, Ui_Kero_Serial):  # 继承QWidget和Ui_For
         super(MyWindow, self).__init__()  # 超级加载
         self.setupUi(self)  # 初始化界面
         self.tabWidget_2.tabCloseRequested.connect(self.tabClose)
+        # Main标签(index=0)不可关闭，隐藏其关闭按钮
+        self.tabWidget_2.tabBar().setTabButton(0, QtWidgets.QTabBar.RightSide, None)
         self.btSaveLog.clicked.connect(self.slot_btn_chooseDir)
         
         # 初始化统计变量
@@ -138,7 +140,10 @@ class MyWindow(QtWidgets.QMainWindow, Ui_Kero_Serial):  # 继承QWidget和Ui_For
         except Exception as e:
             print(f"绑定日志历史加载失败: {e}")
 
-    def tabClose(self,index):
+    def tabClose(self, index):
+        # Main标签(index=0)不允许关闭
+        if index == 0:
+            return
         # 获取要关闭的标签页
         tab_widget = self.tabWidget_2.widget(index)
         if tab_widget:

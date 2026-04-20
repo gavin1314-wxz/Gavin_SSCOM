@@ -627,6 +627,11 @@ class MyTextBrowser(QTextBrowser):
             self._refresh_history_sequence(start_from_previous=False)
             if not self._history_files:
                 return
+            # 懒加载：attach_logger 时文件未创建，_history_files 为空。
+            # 此处首次调用时文件已有本次会话的全部实时数据，
+            # 将当前文件读取指针置 0，避免从文件末尾往前读出已显示数据导致重复。
+            cur_file = self._history_files[0]
+            self._history_positions[cur_file] = 0
         text = self._read_prev_chunk_from_history()
         if text:
             self._prepend_text(text)
@@ -645,11 +650,16 @@ class MyTextBrowser(QTextBrowser):
                 with open(path, 'rb') as f:
                     f.seek(start)
                     data = f.read(to_read)
+                text = data.decode('utf-8', 'ignore')
+                # 统一行尾为 \n，避免 \r 作为普通字符显示导致"不换行"
+                text = text.replace('\r\n', '\n').replace('\r', '\n')
+                # 若不在文件开头，丢弃首个不完整行（字节切块可能从行中间开始）
+                if start > 0:
+                    first_nl = text.find('\n')
+                    if first_nl != -1:
+                        text = text[first_nl + 1:]
                 self._history_positions[path] = start
-                try:
-                    return data.decode('utf-8', 'ignore')
-                except Exception:
-                    return data.decode('utf-8', 'ignore')
+                return text
             except Exception:
                 self._history_active_idx += 1
         return ''
@@ -657,17 +667,32 @@ class MyTextBrowser(QTextBrowser):
     def _prepend_text(self, text: str):
         """在文档开头插入文本"""
         try:
-            cursor = self.textCursor()
             old_val = self.verticalScrollBar().value()
             old_max = self.verticalScrollBar().maximum()
             doc_cursor = QTextCursor(self.document())
             doc_cursor.movePosition(QTextCursor.Start)
-            doc_cursor.insertText(text)
+
+            # Qt 的 insertText 把 \n 当软换行而非段落分隔符，
+            # 必须逐行 insertText + insertBlock 才能正确换行。
+            lines = text.split('\n')
+            if lines and lines[-1] == '':
+                lines = lines[:-1]
+
+            self.setUpdatesEnabled(False)
+            doc_cursor.beginEditBlock()
+            try:
+                for line in lines:
+                    doc_cursor.insertText(line)
+                    doc_cursor.insertBlock()
+            finally:
+                doc_cursor.endEditBlock()
+                self.setUpdatesEnabled(True)
+
             new_max = self.verticalScrollBar().maximum()
             delta = new_max - old_max
             self.verticalScrollBar().setValue(old_val + delta)
         except Exception:
-            pass
+            self.setUpdatesEnabled(True)
     
     def process_buffered_data(self):
         """批量处理缓存的数据（在主线程中执行）"""

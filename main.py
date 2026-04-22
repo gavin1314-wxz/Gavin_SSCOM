@@ -32,6 +32,18 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
+def normalize_saved_log_text(text: str) -> str:
+    """Normalize Qt/plain-text line separators before writing a log file."""
+    if not text:
+        return ""
+    return (
+        text.replace('\r\n', '\n')
+            .replace('\r', '\n')
+            .replace('\u2028', '\n')
+            .replace('\u2029', '\n')
+    )
+
 # 获取软件版本号
 def get_app_version():
     try:
@@ -191,11 +203,16 @@ class MyWindow(QtWidgets.QMainWindow, Ui_Kero_Serial):  # 继承QWidget和Ui_For
         time_str = datetime.now().strftime('%Y%m%d-%H%M%S')
         default_name = './' + uart_port + '_' + time_str + '.log'
         fileName2,Type = QFileDialog.getSaveFileName(self, "文件保存", default_name, "Log Files (*.log)")
+        if not fileName2:
+            return
         try:
-            StrText = self.textBrowserShow.toPlainText()
-            qS = str(StrText)
+            try:
+                self.textBrowserShow.force_update()
+            except Exception:
+                pass
+            qS = normalize_saved_log_text(self.textBrowserShow.toPlainText())
             with open(fileName2, 'w', encoding='utf-8') as f:
-                f.write('{}'.format(qS))
+                f.write(qS)
         except Exception as e:
             logger.error(f"保存日志失败: {e}")
     

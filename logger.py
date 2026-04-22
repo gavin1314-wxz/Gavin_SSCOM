@@ -621,6 +621,25 @@ class SerialLogger:
         except Exception as e:
             logger.error(f"写入自定义行失败: {e}")
 
+    def _iter_prefixed_log_lines(self, text: str, prefix: str, tx: bool = False):
+        """Yield prefixed log fragments while preserving incoming line endings."""
+        lines = text.splitlines(keepends=True)
+        if not lines:
+            lines = [text]
+
+        label = f"{prefix} TX " if tx else f"{prefix} "
+        for line in lines:
+            if line.endswith('\r\n'):
+                body = line[:-2]
+                line_ending = '\r\n'
+            elif line.endswith('\n') or line.endswith('\r'):
+                body = line[:-1]
+                line_ending = '\r\n'
+            else:
+                body = line
+                line_ending = '\r\n' if self.add_newline else ''
+            yield f"{label}{body}{line_ending}"
+
     def log_rx(self, data: bytes):
         """
         记录接收数据
@@ -648,13 +667,8 @@ class SerialLogger:
                 except Exception:
                     text = ' '.join(f"{x:02X}" for x in data)
 
-                # 按行分割，每行单独添加前缀
-                lines = text.splitlines()
-                if not lines:
-                    lines = [text]
-                line_suffix = '\r\n' if self.add_newline else ''
-                for line in lines:
-                    self._async_writer.write(f"{prefix} {line}{line_suffix}")
+                for line in self._iter_prefixed_log_lines(text, prefix):
+                    self._async_writer.write(line)
 
         except Exception as e:
             logger.error(f"记录RX数据失败: {e}")
@@ -688,13 +702,8 @@ class SerialLogger:
                 except Exception:
                     text = ' '.join(f"{x:02X}" for x in data)
 
-                # 按行分割，每行单独添加前缀
-                lines = text.splitlines()
-                if not lines:
-                    lines = [text]
-                line_suffix = '\r\n' if self.add_newline else ''
-                for line in lines:
-                    self._async_writer.write(f"{prefix} TX {line}{line_suffix}")
+                for line in self._iter_prefixed_log_lines(text, prefix, tx=True):
+                    self._async_writer.write(line)
 
         except Exception as e:
             logger.error(f"记录TX数据失败: {e}")

@@ -15,6 +15,7 @@ import os
 import subprocess
 import logging
 import serial
+import threading
 from collections import deque
 from widget.AdvancedFunctionDialog import AdvancedFunctionDialog
 from widget.SerialSettingsDialog import SerialSettingsDialog
@@ -2388,9 +2389,16 @@ class SequenceWorker(QtCore.QThread):
         self.is_loop = is_loop
         self.max_loops = max_loops
         self._running = True
+        self._stop_event = threading.Event()
 
     def stop(self):
         self._running = False
+        self._stop_event.set()
+
+    def _wait_delay(self, delay_ms):
+        if delay_ms <= 0:
+            return self._running
+        return not self._stop_event.wait(delay_ms / 1000.0)
 
     def run(self):
         loop_count = 0
@@ -2423,8 +2431,10 @@ class SequenceWorker(QtCore.QThread):
                     self.statusChanged.emit(f"发送异常: {e}")
                 # 延迟（毫秒）
                 delay_ms = int(item.get('delay', 0))
-                if delay_ms > 0:
-                    self.msleep(delay_ms)
+                if not self._wait_delay(delay_ms):
+                    self.statusChanged.emit("状态: 已停止")
+                    self.finishedSignal.emit("stopped")
+                    return
 
             if not self.is_loop:
                 break
